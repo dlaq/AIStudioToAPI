@@ -1,0 +1,43 @@
+diff --git a/src/core/FormatConverter.js b/src/core/FormatConverter.js
+--- a/src/core/FormatConverter.js
++++ b/src/core/FormatConverter.js
+@@ -808,6 +808,20 @@
+             if (googleParts.length > 0) {
++                const hasToolCalls = Array.isArray(message.tool_calls)
++                    ? message.tool_calls.length > 0
++                    : Boolean(message.tool_calls);
++                const isTerminalAssistantPrefill =
++                    msgIndex === conversationMessages.length - 1 &&
++                    message.role === "assistant" &&
++                    typeof message.content === "string" &&
++                    message.content.trim().length > 0 &&
++                    !hasToolCalls;
++                if (isTerminalAssistantPrefill) {
++                    this.logger.debug(
++                        "[Adapter] Rewriting terminal OpenAI assistant prefill to Gemini user role for compatibility."
++                    );
++                }
+                 googleContents.push({
+                     parts: googleParts,
+-                    role: message.role === "assistant" ? "model" : "user",
++                    role: isTerminalAssistantPrefill ? "user" : message.role === "assistant" ? "model" : "user",
+                 });
+             }
+@@ -2419,6 +2433,16 @@
+             if (googleParts.length > 0) {
++                const isTerminalAssistantPrefill =
++                    message === claudeBody.messages[claudeBody.messages.length - 1] &&
++                    message.role === "assistant" &&
++                    typeof message.content === "string" &&
++                    message.content.trim().length > 0;
++                if (isTerminalAssistantPrefill) {
++                    this.logger.debug(
++                        "[Adapter] Rewriting terminal Anthropic assistant prefill to Gemini user role for compatibility."
++                    );
++                }
+                 googleContents.push({
+                     parts: googleParts,
+-                    role: message.role === "assistant" ? "model" : "user",
++                    role: isTerminalAssistantPrefill ? "user" : message.role === "assistant" ? "model" : "user",
+                 });
+             }
