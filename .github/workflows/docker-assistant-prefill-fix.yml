@@ -17,9 +17,7 @@ permissions:
   packages: write
 
 env:
-  IMAGE_GHCR: ghcr.io/${{ github.repository_owner }}/aistudio-to-api
-  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+  IMAGE: ghcr.io/${{ github.repository_owner }}/aistudio-to-api
 
 jobs:
   build-and-push:
@@ -133,18 +131,6 @@ jobs:
           });
           NODE
 
-      - name: Resolve Docker Hub image
-        id: dockerhub
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -z "${DOCKERHUB_USERNAME:-}" ] || [ -z "${DOCKERHUB_TOKEN:-}" ]; then
-            echo "::error::DOCKERHUB_USERNAME or DOCKERHUB_TOKEN is missing."
-            exit 1
-          fi
-          image="$(printf '%s/aistudio-to-api' "$DOCKERHUB_USERNAME" | tr '[:upper:]' '[:lower:]')"
-          echo "image=$image" >> "$GITHUB_OUTPUT"
-
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -152,11 +138,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ env.DOCKERHUB_USERNAME }}
-          password: ${{ env.DOCKERHUB_TOKEN }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -174,10 +155,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ env.IMAGE_GHCR }}:main-7c356e0-assistant-prefill-fix
-            ${{ env.IMAGE_GHCR }}:assistant-prefill-fix
-            ${{ steps.dockerhub.outputs.image }}:main-7c356e0-assistant-prefill-fix
-            ${{ steps.dockerhub.outputs.image }}:assistant-prefill-fix
+            ${{ env.IMAGE }}:main-7c356e0-assistant-prefill-fix
+            ${{ env.IMAGE }}:assistant-prefill-fix
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: true
@@ -189,7 +168,7 @@ jobs:
             echo "## Patched AIStudioToAPI multi-arch image"
             echo
             echo '```text'
-            echo "${{ steps.dockerhub.outputs.image }}:main-7c356e0-assistant-prefill-fix"
+            echo "${IMAGE}:main-7c356e0-assistant-prefill-fix"
             echo '```'
             echo
             echo "Platforms: linux/amd64, linux/arm64"
