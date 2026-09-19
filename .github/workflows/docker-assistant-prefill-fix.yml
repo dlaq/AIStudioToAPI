@@ -34,7 +34,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: iBUHub/AIStudioToAPI
-          ref: aba601192d9cedad7fe0521769e6e627fd4f660f
+          ref: 7c356e053d39992e4e9e4eda24a940d4d44477e8
           path: app
 
       - name: Copy compatibility patch into upstream source
@@ -154,7 +154,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ env.IMAGE }}:main-aba6011-assistant-prefill-fix
+            ${{ env.IMAGE }}:main-7c356e0-assistant-prefill-fix
             ${{ env.IMAGE }}:assistant-prefill-fix
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -167,10 +167,10 @@ jobs:
             echo "## Patched AIStudioToAPI multi-arch image"
             echo
             echo '```text'
-            echo "${IMAGE}:main-aba6011-assistant-prefill-fix"
+            echo "${IMAGE}:main-7c356e0-assistant-prefill-fix"
             echo '```'
             echo
             echo "Platforms: linux/amd64, linux/arm64"
-            echo "Upstream source: iBUHub/AIStudioToAPI@aba601192d9cedad7fe0521769e6e627fd4f660f"
+            echo "Upstream source: iBUHub/AIStudioToAPI@7c356e053d39992e4e9e4eda24a940d4d44477e8"
             echo "Fix: terminal plain-text Assistant Prefill compatibility for OpenAI and Anthropic request conversion."
           } >> "$GITHUB_STEP_SUMMARY"
