@@ -13,8 +13,6 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME_PRIMARY: ibuhub/aistudio-to-api
-  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME || vars.DOCKERHUB_USERNAME || 'ibuhub' }}
-  DOCKERHUB_REPO: ${{ secrets.DOCKERHUB_USERNAME || vars.DOCKERHUB_USERNAME || 'ibuhub' }}/aistudio-to-api
   VERSION: ${{ github.ref_name }}
 
 jobs:
@@ -58,12 +56,37 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Log into Docker Hub
+      - name: Resolve Docker Hub credentials
+        id: docker
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
-        with:
-          username: ${{ env.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        shell: bash
+        env:
+          DOCKERHUB_USERNAME_SECRET: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_USERNAME_VAR: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKER_USERNAME_SECRET: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_USERNAME_VAR: ${{ vars.DOCKER_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKERHUB_ACCESS_TOKEN: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
+          DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+        run: |
+          set -euo pipefail
+          username="${DOCKERHUB_USERNAME_SECRET:-${DOCKERHUB_USERNAME_VAR:-${DOCKER_USERNAME_SECRET:-${DOCKER_USERNAME_VAR:-}}}}"
+          token="${DOCKERHUB_TOKEN:-${DOCKERHUB_ACCESS_TOKEN:-${DOCKERHUB_PASSWORD:-${DOCKER_PASSWORD:-${DOCKER_TOKEN:-}}}}}"
+          if [ -z "$username" ]; then
+            echo "::error::Docker Hub username is not configured."
+            exit 1
+          fi
+          if [ -z "$token" ]; then
+            echo "::error::Docker Hub credential is not configured."
+            exit 1
+          fi
+          image="$(printf '%s/aistudio-to-api' "$username" | tr '[:upper:]' '[:lower:]')"
+          echo "::add-mask::$token"
+          printf '%s' "$token" | docker login --username "$username" --password-stdin
+          echo "username=$username" >> "$GITHUB_OUTPUT"
+          echo "repository=$image" >> "$GITHUB_OUTPUT"
 
       - name: Extract Docker metadata
         id: meta
@@ -71,7 +94,7 @@ jobs:
         with:
           images: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_PRIMARY }}
-            ${{ env.DOCKERHUB_REPO }}
+            ${{ steps.docker.outputs.repository }}
           tags: |
             type=ref,event=tag
             type=raw,value=${{ steps.generate_tag.outputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
