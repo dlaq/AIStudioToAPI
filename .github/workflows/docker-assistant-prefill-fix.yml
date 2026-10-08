@@ -2,11 +2,12 @@ name: Docker - Assistant Prefill Fix
 
 on:
   push:
-    branches: [main]
+    branches: [upgrade/aistudio-v1.4.0-prefill-fix]
     paths:
       - "patches/assistant-prefill-compat.patch"
       - ".github/workflows/docker-assistant-prefill-fix.yml"
       - "Dockerfile"
+      - "src/core/FormatConverter/**"
       - "src/**"
       - "package.json"
       - "package-lock.json"
@@ -14,10 +15,19 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/aistudio-to-api
+  DOCKERHUB_USERNAME_SECRET: ${{ secrets.DOCKERHUB_USERNAME }}
+  DOCKERHUB_USERNAME_VAR: ${{ vars.DOCKERHUB_USERNAME }}
+  DOCKER_USERNAME_SECRET: ${{ secrets.DOCKER_USERNAME }}
+  DOCKER_USERNAME_VAR: ${{ vars.DOCKER_USERNAME }}
+  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+  DOCKERHUB_ACCESS_TOKEN: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
+  DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+  DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+  DOCKERHUB_IMAGE_VAR: ${{ vars.DOCKERHUB_IMAGE }}
+  DOCKERHUB_REPOSITORY_VAR: ${{ vars.DOCKERHUB_REPOSITORY }}
 
 jobs:
   build-and-push:
@@ -34,7 +44,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: iBUHub/AIStudioToAPI
-          ref: 7c356e053d39992e4e9e4eda24a940d4d44477e8
+          ref: 0c5b6d379c4ef066b3bad01a5b4fee41626cb545
           path: app
 
       - name: Copy compatibility patch into upstream source
@@ -47,9 +57,10 @@ jobs:
           set -euo pipefail
           git apply --check assistant-prefill-compat.patch
           git apply assistant-prefill-compat.patch
-          node --check src/core/FormatConverter.js
-          grep -Fq 'Rewriting terminal OpenAI assistant prefill' src/core/FormatConverter.js
-          grep -Fq 'Rewriting terminal Anthropic assistant prefill' src/core/FormatConverter.js
+          node --check src/core/FormatConverter/ChatCompletionsConverter.js
+          node --check src/core/FormatConverter/ClaudeRequestConverter.js
+          grep -Fq 'Rewriting terminal OpenAI assistant prefill' src/core/FormatConverter/ChatCompletionsConverter.js
+          grep -Fq 'Rewriting terminal Anthropic assistant prefill' src/core/FormatConverter/ClaudeRequestConverter.js
 
       - name: Install dependencies for smoke test
         working-directory: app
@@ -131,12 +142,26 @@ jobs:
           });
           NODE
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve Docker Hub credentials and image name
+        id: docker
+        shell: bash
+        run: |
+          set -euo pipefail
+          username="${DOCKERHUB_USERNAME_SECRET:-${DOCKERHUB_USERNAME_VAR:-${DOCKER_USERNAME_SECRET:-${DOCKER_USERNAME_VAR:-}}}}"
+          token="${DOCKERHUB_TOKEN:-${DOCKERHUB_ACCESS_TOKEN:-${DOCKERHUB_PASSWORD:-${DOCKER_PASSWORD:-${DOCKER_TOKEN:-}}}}}"
+          if [ -z "$username" ]; then
+            echo "::error::Docker Hub username is not configured."
+            exit 1
+          fi
+          if [ -z "$token" ]; then
+            echo "::error::Docker Hub credential is not configured."
+            exit 1
+          fi
+          image="${DOCKERHUB_IMAGE_VAR:-${DOCKERHUB_REPOSITORY_VAR:-$username/aistudio-to-api}}"
+          image="$(printf '%s' "$image" | tr '[:upper:]' '[:lower:]')"
+          echo "::add-mask::$token"
+          printf '%s' "$token" | docker login --username "$username" --password-stdin
+          echo "image=$image" >> "$GITHUB_OUTPUT"
 
 
       - name: Set up QEMU
@@ -155,8 +180,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ env.IMAGE }}:main-7c356e0-assistant-prefill-fix
-            ${{ env.IMAGE }}:assistant-prefill-fix
+            ${{ steps.docker.outputs.image }}:v1.4.0-assistant-prefill-fix-test
+            ${{ steps.docker.outputs.image }}:assistant-prefill-fix-v1.4.0-test
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: true
@@ -168,10 +193,10 @@ jobs:
             echo "## Patched AIStudioToAPI multi-arch image"
             echo
             echo '```text'
-            echo "${IMAGE}:main-7c356e0-assistant-prefill-fix"
+            echo "${{ steps.docker.outputs.image }}:v1.4.0-assistant-prefill-fix-test"
             echo '```'
             echo
             echo "Platforms: linux/amd64, linux/arm64"
-            echo "Upstream source: iBUHub/AIStudioToAPI@7c356e053d39992e4e9e4eda24a940d4d44477e8"
+            echo "Upstream source: iBUHub/AIStudioToAPI@0c5b6d379c4ef066b3bad01a5b4fee41626cb545"
             echo "Fix: terminal plain-text Assistant Prefill compatibility for OpenAI and Anthropic request conversion."
           } >> "$GITHUB_STEP_SUMMARY"
