@@ -1,0 +1,54 @@
+diff --git a/src/core/FormatConverter/ChatCompletionsConverter.js b/src/core/FormatConverter/ChatCompletionsConverter.js
+--- a/src/core/FormatConverter/ChatCompletionsConverter.js
++++ b/src/core/FormatConverter/ChatCompletionsConverter.js
+@@ -281,7 +281,22 @@ class ChatCompletionsConverter extends FormatConverter {
+             }
+ 
+             if (googleParts.length > 0) {
+-                if (message.role === "assistant") {
++                const hasToolCalls = Array.isArray(message.tool_calls)
++                    ? message.tool_calls.length > 0
++                    : Boolean(message.tool_calls);
++                const isTerminalAssistantPrefill =
++                    msgIndex === conversationMessages.length - 1 &&
++                    message.role === "assistant" &&
++                    typeof message.content === "string" &&
++                    message.content.trim().length > 0 &&
++                    !hasToolCalls;
++                if (isTerminalAssistantPrefill) {
++                    this.logger.debug(
++                        "[Adapter] Rewriting terminal OpenAI assistant prefill to Gemini user role for compatibility."
++                    );
++                    pendingModelParts.flush();
++                    googleContents.push({ parts: googleParts, role: "user" });
++                } else if (message.role === "assistant") {
+                     pendingModelParts.push(...googleParts);
+                 } else {
+                     googleContents.push({ parts: googleParts, role: "user" });
+                 }
+             }
+diff --git a/src/core/FormatConverter/ClaudeRequestConverter.js b/src/core/FormatConverter/ClaudeRequestConverter.js
+--- a/src/core/FormatConverter/ClaudeRequestConverter.js
++++ b/src/core/FormatConverter/ClaudeRequestConverter.js
+@@ -353,7 +353,18 @@ class ClaudeRequestConverter extends FormatConverter {
+             }
+ 
+             if (googleParts.length > 0) {
+-                if (message.role === "assistant") {
++                const isTerminalAssistantPrefill =
++                    message === claudeBody.messages[claudeBody.messages.length - 1] &&
++                    message.role === "assistant" &&
++                    typeof message.content === "string" &&
++                    message.content.trim().length > 0;
++                if (isTerminalAssistantPrefill) {
++                    this.logger.debug(
++                        "[Adapter] Rewriting terminal Anthropic assistant prefill to Gemini user role for compatibility."
++                    );
++                    pendingModelParts.flush();
++                    googleContents.push({ parts: googleParts, role: "user" });
++                } else if (message.role === "assistant") {
+                     pendingModelParts.push(...googleParts);
+                 } else {
+                     googleContents.push({ parts: googleParts, role: "user" });
+                 }
+             }
