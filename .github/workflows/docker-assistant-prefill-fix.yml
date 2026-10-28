@@ -147,17 +147,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          username="${DOCKERHUB_USERNAME_SECRET:-${DOCKERHUB_USERNAME_VAR:-${DOCKER_USERNAME_SECRET:-${DOCKER_USERNAME_VAR:-}}}}"
+          username="${DOCKERHUB_USERNAME_SECRET:-${DOCKERHUB_USERNAME_VAR:-${DOCKER_USERNAME_SECRET:-${DOCKER_USERNAME_VAR:-${GITHUB_REPOSITORY_OWNER:-dlaq}}}}}"
           token="${DOCKERHUB_TOKEN:-${DOCKERHUB_ACCESS_TOKEN:-${DOCKERHUB_PASSWORD:-${DOCKER_PASSWORD:-${DOCKER_TOKEN:-}}}}}"
-          if [ -z "$username" ]; then
-            echo "::error::Docker Hub username is not configured."
-            exit 1
-          fi
           if [ -z "$token" ]; then
             echo "::error::Docker Hub credential is not configured."
             exit 1
           fi
-          image="${DOCKERHUB_IMAGE_VAR:-${DOCKERHUB_REPOSITORY_VAR:-$username/aistudio-to-api}}"
+          image="${DOCKERHUB_IMAGE_VAR:-${DOCKERHUB_REPOSITORY_VAR:-${GITHUB_REPOSITORY_OWNER:-dlaq}/aistudio-to-api}}"
           image="$(printf '%s' "$image" | tr '[:upper:]' '[:lower:]')"
           echo "::add-mask::$token"
           printf '%s' "$token" | docker login --username "$username" --password-stdin
